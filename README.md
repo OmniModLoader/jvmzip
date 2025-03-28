@@ -6,6 +6,8 @@
 This is a custom Zip parser meant for speed. It only supports what the JVM is capable of loading in.
 However, I do not have access to Zip64 files so that feature will be added when I do.
 
+Please check the wiki if you want to learn more about the Zip Spec, which is really annoying and kinda hard to read. 
+
 ## What does this thing support?
 Well i'm glad you asked, almost no built-in Zip options.
 As I quote it from the official source: ["A JAR file is essentially a zip file that contains an optional META-INF directory"](https://docs.oracle.com/en/java/javase/17/docs/specs/jar/jar.html).
