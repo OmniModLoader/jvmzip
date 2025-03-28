@@ -41,7 +41,8 @@ It is a very simple dumb down Zip library so if you want speed > features, go ri
 
 ## Contributing
 If you feel the need to help me in my efforts of understanding the rambles of a mad man, that is [APPNOTE.TXT](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT).
-Please remember optimization is our main focus here, pull out all the stops even if it makes the code look garbage.
+Please remember optimization is our main focus here, pull out all the stops.
+Also, JUnit tests are mandatory for all contributing.
 
 Every line of code contributed to OmniMC is appreciated.
 
