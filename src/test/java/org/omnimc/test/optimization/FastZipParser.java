@@ -77,14 +77,14 @@ public final class FastZipParser implements Closeable { // TODO try to improve t
 
     // TODO work on these so the performance isn't so ass
     public List<ZipEntry> getEntries() throws IOException {
-        return getEntries((_) -> true);
+        return getEntries((s) -> true);
     }
 
     public List<ZipEntry> getEntries(Predicate<String> filter) throws IOException {
         List<ZipEntry> entries = new ArrayList<>();
 
         while (true) {
-            ZipEntry entry = getEntry("", (_, fileName) -> filter.test(fileName));
+            ZipEntry entry = getEntry("", (s, fileName) -> filter.test(fileName));
             if (entry == null) {
                 return entries;
             }
