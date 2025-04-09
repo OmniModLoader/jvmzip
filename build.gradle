@@ -27,7 +27,7 @@ plugins {
 }
 
 group = 'org.omnimc'
-version = '1.0.0'
+version = '1.1.0'
 
 repositories {
     mavenCentral()
@@ -41,7 +41,6 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
 
     testImplementation 'dev.7ori:RuntimeProfiler:1.1.0'
-
 }
 
 test {
