@@ -26,6 +26,7 @@ package org.omnimc.jvmzip;
 
 import org.omnimc.jvmzip.entry.ZipEntry;
 import org.omnimc.jvmzip.throwables.CentralDirectoryException;
+import org.omnimc.jvmzip.util.SearchData;
 import org.omnimc.jvmzip.util.ZipSearcher;
 
 import java.io.Closeable;
@@ -37,6 +38,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import static org.omnimc.jvmzip.util.LittleEndian.toInt4;
 import static org.omnimc.jvmzip.util.ZipSearcher.getFirstCentralDirectoryOffset;
@@ -91,6 +93,55 @@ public final class ZipParser implements Closeable {
     }
 
     /**
+     * A variant of {@link ZipParser#getEntry(String)} that allows for early termination of the search process.
+     * <p>
+     *     The {@code earlyExit} predicate gives you fine-grained control over when to abort parsing during entry iteration.
+     *     This is useful for performance optimization when you don't need to scan the entire central directory.
+     * <p>
+     *     The predicate receives a {@link SearchData} object and can decide to exit early based on the current entry state,
+     *     offset, name, etc. If {@code earlyExit.test(data)} returns {@code true}, parsing stops immediately and returns {@code null}.
+     *
+     * @param fileName  The name of the file you are looking for.
+     * @param earlyExit A predicate that can return true to stop the search early during traversal.
+     * @return A {@link ZipEntry} or {@code null} if not found or if the predicate triggers early exit.
+     * @throws IOException If an I/O error occurs while reading the file.
+     * @throws CentralDirectoryException If the central directory is not initialized or malformed.
+     */
+    public ZipEntry getEntry(String fileName, Predicate<SearchData> earlyExit) throws IOException {
+        return getEntry(fileName, String::equals, earlyExit);
+    }
+
+    /**
+     * A {@link ZipParser#getEntry(String, BiPredicate)} but with a {@link Predicate} to test entries.
+     *
+     * @param filter The {@link Predicate} to test for entries
+     * @return {@link ZipEntry}, {@code null} if the entry does not exist.
+     * @throws IOException {@link ZipSearcher#getEntry(long, RandomAccessFile, Function)} check this out.
+     * @throws CentralDirectoryException If the central directory was not initialized or if it doesn't exist.
+     */
+    public ZipEntry getEntry(Predicate<String> filter) throws IOException {
+        return getEntry("", (s, s2) -> filter.test(s2));
+    }
+
+    /**
+     * A variant of {@link ZipParser#getEntry(Predicate)} that allows early exit during directory scan.
+     * <p>
+     *     The {@code earlyExit} predicate is passed each {@link SearchData} instance during traversal and may return {@code true}
+     *     to halt the scan early. This is useful if you want to scan for metadata, or just want to abort for performance reasons.
+     * <p>
+     *     For example, you could stop after finding the first match or if a certain entry size is encountered.
+     *
+     * @param filter    A predicate that tests entry names for matching.
+     * @param earlyExit A predicate for deciding if the scan should stop based on current search state.
+     * @return A matching {@link ZipEntry}, or {@code null} if not found or exited early.
+     * @throws IOException If an error occurs during access.
+     * @throws CentralDirectoryException If the directory cannot be read or was never initialized.
+     */
+    public ZipEntry getEntry(Predicate<String> filter, Predicate<SearchData> earlyExit) throws IOException {
+        return getEntry("", (s, s2) -> filter.test(s2), earlyExit);
+    }
+
+    /**
      * A method that searches a Zip by looking with a filter.
      * <p>
      *     The way we do this is by using {@linkplain ZipSearcher#getEntry(long, RandomAccessFile, Function)},
@@ -109,6 +160,31 @@ public final class ZipParser implements Closeable {
      * @throws CentralDirectoryException If the central directory was not initialized or if it doesn't exist.
      */
     public ZipEntry getEntry(String fileName, BiPredicate<String, String> filter) throws IOException {
+        return getEntry(fileName, filter, (sD -> false));
+    }
+
+    /**
+     * Fully customizable search method with fine-grained control over filtering and early termination.
+     * <p>
+     *     This method allows for:
+     *     <ul>
+     *         <li>Specifying a file name to search from a central directory</li>
+     *         <li>Using a {@link BiPredicate} to define the name matching logic</li>
+     *         <li>Using a {@link Predicate} to optionally halt the search prematurely with {@code earlyExit}</li>
+     *     </ul>
+     *     The {@code earlyExit} predicate receives the current {@link SearchData} during iteration.
+     *     If it returns {@code true}, the scan stops and returns {@code null} immediately.
+     * <p>
+     *     This is especially useful in large ZIP files where scanning everything is unnecessary or expensive.
+     *
+     * @param fileName  The logical target name to base your search on (passed to your filter).
+     * @param filter    The "rule" you want it to abide by, first String is your provided file name, and the next is the name of the entry it got.
+     * @param earlyExit A {@link Predicate} of {@link SearchData} that can abort parsing early.
+     * @return The matching {@link ZipEntry}, or {@code null} if not found or scan was aborted.
+     * @throws IOException If any read errors occur.
+     * @throws CentralDirectoryException If the ZIP’s directory metadata is missing or corrupt.
+     */
+    public ZipEntry getEntry(String fileName, BiPredicate<String, String> filter, Predicate<SearchData> earlyExit) throws IOException {
         if (centralDirectoryOffset == -1) {
             throw new CentralDirectoryException("Either the central directory has not been initialized, or it doesn't exist.");
         }
@@ -123,8 +199,15 @@ public final class ZipParser implements Closeable {
             switch (searchData.getState()) {
                 case SKIPPING:
                     updateCacheAndOffset(searchData.getName(), searchData.getCurrentOffset(), searchData.getSkipAmount());
+                    if (earlyExit.test(searchData)) {
+                        return ZipEntry.emptyEntry();
+                    }
                     return null;
                 case SEARCHING:
+                    if (earlyExit.test(searchData)) {
+                        return ZipEntry.emptyEntry();
+                    }
+
                     if (!filter.test(fileName, searchData.getName())) {
                         return null;
                     }
@@ -149,7 +232,7 @@ public final class ZipParser implements Closeable {
             nextCentralDirectoryOffset = -1;
         }
 
-        return entry;
+        return (entry != null && entry.getName() == null) ? null : entry;
     }
 
     /**
