@@ -22,12 +22,15 @@
  * SOFTWARE.
  */
 
+import net.thebugmc.gradle.sonatypepublisher.PublishingType
+
 plugins {
     id 'java'
+    id("net.thebugmc.gradle.sonatype-central-portal-publisher") version "1.2.4"
 }
 
 group = 'org.omnimc'
-version = '1.0.0'
+version = project.findProperty("version") ?: "1.0.0-SNAPSHOT-BUILD-ONLY" // version 1.1.0
 
 repositories {
     mavenCentral()
@@ -41,7 +44,57 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
 
     testImplementation 'dev.7ori:RuntimeProfiler:1.1.0'
+}
 
+signing {
+    def signingKey = findProperty("signingKey")
+    def signingPassword = findProperty("signingPassword")
+    //noinspection GroovyAssignabilityCheck
+    useInMemoryPgpKeys(signingKey, signingPassword)
+}
+
+centralPortal {
+    if (version.toString().endsWith("BUILD-ONLY")) {
+        throw new GradleException("You cannot publish a build-only version. You may have not set the version.")
+    }
+
+    username = mavenCentralUsername
+    password = mavenCentralPassword
+
+    name = "jvmzip"
+
+    publishingType = PublishingType.USER_MANAGED // This is so we can manually review a release before published.
+
+    pom {
+        name = "JVMZip"
+        description = "An ultra lightweight and fast zip parsing library."
+        url = "https://www.omnimc.org"
+
+        organization {
+            name = "OmniMC"
+            url = "https://www.omnimc.org"
+        }
+
+        developers {
+            developer {
+                id = "caden"
+                name = "Caden"
+                url = "https://github.com/CadenCCC"
+            }
+        }
+
+        licenses {
+            license {
+                name = "MIT License"
+            }
+        }
+
+        scm {
+            connection = 'scm:git:git://github.com/OmniModLoader/jvmzip.git'
+            developerConnection = 'scm:git:ssh://github.com:OmniModLoader/jvmzip.git'
+            url = 'https://github.com/OmniModLoader/jvmzip'
+        }
+    }
 }
 
 test {

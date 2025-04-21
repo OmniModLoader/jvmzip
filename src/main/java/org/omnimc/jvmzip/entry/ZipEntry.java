@@ -37,6 +37,10 @@ import java.util.zip.Inflater;
  */
 public final class ZipEntry {
 
+    public static ZipEntry emptyEntry() {
+        return new ZipEntry(null, null, 0, 0, 0);
+    }
+
     private final String name;
     private final byte[] compressedData;
 
